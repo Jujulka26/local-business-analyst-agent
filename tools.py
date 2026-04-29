@@ -6,18 +6,19 @@ from crewai.tools import tool
 df = pd.read_csv("tesla_stock_data.csv")
 cols = df.columns.tolist()
 
-@tool("analyze_data")
-def analyze_data(python_code: str) -> str:
-    """Executes a single line of Pandas code on 'df' for math/stats. Available columns: Date, Open, High, Low, Close, Volume."""
+@tool("get_stock_stats")
+def get_stock_stats(column: str) -> str:
+    """Returns the average, highest, and lowest value for a column in the Tesla dataset. Pass the exact column name, e.g. 'Close'."""
     try:
-        code = str(python_code).replace("python", "").replace("```", "").strip()
-        if code.startswith("print(") and code.endswith(")"):
-            code = code[6:-1].strip()
-        result = eval(code, {"df": df, "pd": pd})
-        return f"Calculation Result: {result}"
+        if column not in df.columns:
+            return f"Column '{column}' not found. Available: {df.columns.tolist()}"
+        avg = round(df[column].mean(), 4)
+        high = round(df[column].max(), 4)
+        low = round(df[column].min(), 4)
+        return f"Average: {avg}, Highest: {high}, Lowest: {low}"
     except Exception as e:
-        return f"Math Error: {e}"
-
+        return f"Data Error: {e}"
+    
 @tool("create_chart")
 def create_chart(column_name: str) -> str:
     """Creates a line chart for a column in the Tesla stock dataset and saves it as chart.png. Pass the exact column name, e.g. 'Close'."""
@@ -79,4 +80,4 @@ def scrape_website(url: str) -> str:
     except Exception as e:
         return f"Scrape Error: {e}"
 
-stock_tools = [analyze_data, create_chart, web_search]
+stock_tools = [get_stock_stats, create_chart, web_search]

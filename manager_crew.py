@@ -1,11 +1,10 @@
 from crewai import Agent, Task, Crew, Process
 from tools import stock_tools, scrape_website
 
-# 1. THE BRAIN (Modern 2026 Way)
-# By using the string "ollama/gemma4:e2b", you avoid the Pydantic validation error!
 local_llm = "ollama/gemma4:e2b"
 
-# 2. THE AGENTS
+# ── STOCK ANALYSIS CREW ──────────────────────────────────────────────────────
+
 researcher = Agent(
     role='Financial Researcher',
     goal='Provide accurate numerical analysis of Tesla stock.',
@@ -19,7 +18,7 @@ news_analyst = Agent(
     role='Market News Analyst',
     goal='Find the latest real-world news affecting Tesla.',
     backstory='You are a sharp financial journalist who uses the web to find breaking news.',
-    tools=[stock_tools[2]], # search_tool (DuckDuckGo)
+    tools=[stock_tools[2]],
     llm=local_llm,
     verbose=True
 )
@@ -33,6 +32,22 @@ designer = Agent(
     verbose=True
 )
 
+reporter = Agent(
+    role='Stock Report Writer',
+    goal='Combine numerical analysis, news, and chart confirmation into one clear analyst report.',
+    backstory=(
+        'You are a senior financial writer at a research firm. '
+        'You receive raw data findings, a news update, and a chart status, '
+        'then write a clean 1-page analyst report. '
+        'Always include a disclaimer that this is a demo portfolio project, not real investment advice.'
+    ),
+    tools=[],
+    llm=local_llm,
+    verbose=True
+)
+
+# ── STANDALONE DEMO AGENT ────────────────────────────────────────────────────
+
 resume_scraper = Agent(
     role='Content Storyteller',
     goal='Scrape a website and retell its content as an engaging short story.',
@@ -42,16 +57,17 @@ resume_scraper = Agent(
     verbose=True
 )
 
-# 3. THE TASKS (Same as before)
+# ── TASKS ────────────────────────────────────────────────────────────────────
+
 math_task = Task(
-    description="What is the average closing price of Tesla in this dataset?",
-    expected_output="A single numerical value with a short explanation.",
+    description="Find the average, highest, and lowest closing price of Tesla in this dataset.",
+    expected_output="Three numerical values: average, highest, and lowest closing price with brief labels.",
     agent=researcher
 )
 
 news_task = Task(
-    description="Use the DuckDuckGo search tool to find one recent news headline about Tesla today.",
-    expected_output="A short paragraph containing the live news headline and a brief summary.",
+    description="Search for the most recent Tesla news available. Pick the latest article you can find regardless of when it was published. Include the date and time of the article if available.",
+    expected_output="The headline, publication date/time, source, and a 2-sentence summary of what happened.",
     agent=news_analyst
 )
 
@@ -61,26 +77,39 @@ chart_task = Task(
     agent=designer
 )
 
+report_task = Task(
+    description=(
+        "Using the outputs from the researcher, news analyst, and designer, "
+        "write a concise 1-page Tesla stock analyst report. "
+        "Structure it with sections: Summary, Key Numbers, Latest News, Chart, and Disclaimer."
+    ),
+    expected_output="A clean, structured 1-page analyst report in plain text.",
+    agent=reporter,
+    context=[math_task, news_task, chart_task]
+)
+
 resume_task = Task(
     description="Scrape the content at https://jujulka26.github.io/my-resume-angular/ and write a story that summarizes the content.",
     expected_output="A short story that captures the key points obtained in the scraped content, only in one paragraph.",
     agent=resume_scraper
 )
 
-# 4. THE CREW
-manager_crew = Crew(
-    agents=[resume_scraper, researcher, news_analyst, designer],
-    tasks=[resume_task, math_task, news_task, chart_task],
+# ── CREWS ────────────────────────────────────────────────────────────────────
+
+stock_crew = Crew(
+    agents=[researcher, news_analyst, designer, reporter],
+    tasks=[math_task, news_task, chart_task, report_task],
     process=Process.sequential
 )
 
-if __name__ == "__main__":
-    test_crew = Crew(
+resume_crew = Crew(
     agents=[resume_scraper],
     tasks=[resume_task],
-    )
-    print("🚀 Crew is starting work with Gemma 4 e2b...")
-    result = test_crew.kickoff()
+)
+
+if __name__ == "__main__":
+    print("🚀 Running Tesla Stock Analysis...")
+    result = stock_crew.kickoff()
     print("\n\n########################")
-    print("## FINAL REPORT ##")
+    print("## ANALYST REPORT ##")
     print(result)
